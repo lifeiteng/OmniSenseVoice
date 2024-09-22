@@ -20,4 +20,5 @@ pip install pre-commit==3.6.0
 pre-commit install
 ```
 
-#### step1: make a Pull Request
+#### step2: make a Pull Request
+😊😊

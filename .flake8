@@ -1,0 +1,9 @@
+[flake8]
+show-source=true
+statistics=true
+max-line-length = 120
+per-file-ignores =
+
+exclude =
+  .git,
+  setup.py,

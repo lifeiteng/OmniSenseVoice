@@ -13,7 +13,9 @@ setup(
     readme="README.md",
     python_requires=">=3.8",
     install_requires=[
-        "pre-commit==3.6.0",
+        "funasr_onnx==0.4.1",
+        "modelscope==1.18.0",
+        "funasr==1.1.6",
     ],
     entry_points={
         "console_scripts": [

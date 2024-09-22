@@ -8,10 +8,16 @@ Wrapper of [SenseVoice](https://github.com/FunAudioLLM/SenseVoice), optimized th
 
 ```
 
-## Formatting
-* `pre-commit`
-
 ## Install
 ```
 pip install .
 ```
+
+## Contributing
+#### step1: set code Formatting
+```
+pip install pre-commit==3.6.0
+pre-commit install
+```
+
+#### step1: make a Pull Request

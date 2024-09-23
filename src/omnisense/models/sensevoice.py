@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- encoding: utf-8 -*-
 
-import os.path
 import re
 from pathlib import Path
 from typing import Any, List, NamedTuple, Optional, Tuple, Union
@@ -78,21 +77,11 @@ class OmniSenseVoiceSmall:
         cache_dir: str = None,
     ):
         model, kwargs = SenseVoiceSmall.from_pretrained(model_dir, quantize=quantize)
-        del kwargs
 
-        if not Path(model_dir).exists():
-            from modelscope.hub.snapshot_download import snapshot_download
-
-            model_dir = snapshot_download(model_dir, cache_dir=cache_dir)
-
-        config_file = os.path.join(model_dir, "config.yaml")
-        cmvn_file = os.path.join(model_dir, "am.mvn")
+        config_file = kwargs["config"]
         config = read_yaml(config_file)
 
-        self.tokenizer = SentencepiecesTokenizer(
-            bpemodel=os.path.join(model_dir, "chn_jpn_yue_eng_ko_spectok.bpe.model")
-        )
-        config["frontend_conf"]["cmvn_file"] = cmvn_file
+        self.tokenizer = SentencepiecesTokenizer(bpemodel=kwargs["tokenizer_conf"]["bpemodel"])
         self.frontend = WavFrontend(**config["frontend_conf"])
         self.sampling_rate = self.frontend.opts.frame_opts.samp_freq
 
@@ -105,10 +94,6 @@ class OmniSenseVoiceSmall:
         self.model = model.to(self.device)
 
         self.blank_id = 0
-        self.lid_dict = {"auto": 0, "zh": 3, "en": 4, "yue": 7, "ja": 11, "ko": 12, "nospeech": 13}
-        self.lid_int_dict = {24884: 3, 24885: 4, 24888: 7, 24892: 11, 24896: 12, 24992: 13}
-        self.textnorm_dict = {"withitn": 14, "woitn": 15}
-        self.textnorm_int_dict = {25016: 14, 25017: 15}
 
     @torch.no_grad()
     def transcribe(

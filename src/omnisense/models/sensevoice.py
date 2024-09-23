@@ -74,9 +74,9 @@ class OmniSenseVoiceSmall:
         model_dir: Union[str, Path] = None,
         device_id: Union[str, int] = "-1",
         quantize: bool = False,
-        cache_dir: str = None,
     ):
         model, kwargs = SenseVoiceSmall.from_pretrained(model_dir, quantize=quantize)
+        device_id = int(device_id)
 
         config_file = kwargs["config"]
         config = read_yaml(config_file)
@@ -86,7 +86,7 @@ class OmniSenseVoiceSmall:
         self.sampling_rate = self.frontend.opts.frame_opts.samp_freq
 
         self.device = "cpu"
-        if device_id != "-1":
+        if device_id != -1:
             assert torch.cuda.is_available(), "CUDA is not available"
             self.device = f"cuda:{device_id}"
 
@@ -206,7 +206,7 @@ class NumpyDataset(Dataset):
         if isinstance(segment[1], np.ndarray):
             audio = segment
         elif isinstance(segment[1], Pathlike):
-            audio = (segment[0], librosa.load(segment, sr=self.sampling_rate, mono=True)[0])
+            audio = (segment[0], librosa.load(segment[1], sr=self.sampling_rate, mono=True)[0])
         elif isinstance(segment[1], Cut):
             audio = (segment[0], segment[1].resample(self.sampling_rate).load_audio()[0])
         else:

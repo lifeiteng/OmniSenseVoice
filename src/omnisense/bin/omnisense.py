@@ -29,12 +29,28 @@ from .cli_base import cli
     default="withitn",
     help="Text normalization.",
 )
+@click.option(
+    "-g",
+    "--device-id",
+    type=int,
+    default=-1,
+    help="GPU ID to run the model(defualt: -1 use cpu).",
+)
+@click.option(
+    "--quantize",
+    is_flag=True,
+    help="Use quantized model.",
+)
 def transcribe(
     audio_path: Pathlike,
     language: str,
     textnorm: str,
+    device_id: int,
+    quantize: str,
 ):
-    pass
+    omnisense = OmniSenseVoiceSmall("iic/SenseVoiceSmall", quantize=quantize, device_id=device_id)
+    result = omnisense.transcribe(audio_path, language=language, textnorm=textnorm)
+    print(result[0].text)
 
 
 @cli.command()

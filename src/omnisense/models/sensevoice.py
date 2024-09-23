@@ -191,22 +191,6 @@ class OmniSenseVoiceSmall:
 
         return [OmniTranscription.parse(i) for i in results]
 
-    def load_data(self, wav_content: Union[str, np.ndarray, List[str]], fs: int = None) -> List:
-        def load_wav(path: str) -> np.ndarray:
-            waveform, _ = librosa.load(path, sr=fs)
-            return waveform
-
-        if isinstance(wav_content, np.ndarray):
-            return [wav_content]
-
-        if isinstance(wav_content, str):
-            return [load_wav(wav_content)]
-
-        if isinstance(wav_content, list):
-            return [load_wav(path) for path in wav_content]
-
-        raise TypeError(f"The type of {wav_content} is not in [str, np.ndarray, list]")
-
     def extract_feat(self, waveform_list: List[np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
         feats, feats_len = [], []
         for waveform in waveform_list:

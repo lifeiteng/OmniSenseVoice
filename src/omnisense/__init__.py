@@ -1,1 +1,1 @@
-from .sensevoice import OmniSenseVoiceSmall
+from omnisense.models import OmniSenseVoiceSmall, OmniTranscription

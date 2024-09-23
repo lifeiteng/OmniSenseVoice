@@ -17,6 +17,8 @@ setup(
         "modelscope==1.18.0",
         "funasr==1.1.6",
         "lhotse>=1.24.2",
+        "kaldialign",
+        "onnxruntime-gpu==1.19.2",
     ],
     entry_points={
         "console_scripts": ["omnisense=omnisense.bin:cli"],

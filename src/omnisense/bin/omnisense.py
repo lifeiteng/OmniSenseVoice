@@ -1,5 +1,13 @@
+import logging
+import re
+import time
+
 import click
+from kaldialign import edit_distance
+from lhotse import load_manifest
 from lhotse.utils import Pathlike
+
+from omnisense.models import OmniSenseVoiceSmall, OmniTranscription
 
 from .cli_base import cli
 
@@ -43,12 +51,103 @@ def transcribe(
 @click.option(
     "--textnorm",
     type=click.Choice(["withitn", "woitn"]),
-    default="withitn",
+    default="woitn",
     help="Text normalization.",
+)
+@click.option(
+    "--device-id",
+    type=int,
+    default=-1,
+    help="Device ID to run the model.",
+)
+@click.option(
+    "-s",
+    "--sort-by-duration",
+    is_flag=True,
+    help="Sort cuts by duration before processing.",
+)
+@click.option(
+    "--batch-size",
+    type=int,
+    default=4,
+    help="Batch size.",
+)
+@click.option(
+    "--num-workers",
+    type=int,
+    default=0,
+    help="Number of workers.",
+)
+@click.option(
+    "--quantize",
+    is_flag=True,
+    help="Use quantized model.",
+)
+@click.option(
+    "-d",
+    "--debug",
+    is_flag=True,
+    help="debug.",
 )
 def benchmark(
     manifest_path: Pathlike,
     language: str,
     textnorm: str,
+    device_id: int,
+    sort_by_duration: bool,
+    batch_size: int = 4,
+    num_workers: int = 0,
+    quantize: bool = False,
+    debug: bool = False,
 ):
-    pass
+    return _benchmark(
+        manifest_path, language, textnorm, device_id, sort_by_duration, batch_size, num_workers, quantize, debug
+    )
+
+
+def _benchmark(
+    manifest_path: Pathlike,
+    language: str,
+    textnorm: str,
+    device_id: int,
+    sort_by_duration: bool,
+    batch_size: int = 4,
+    num_workers: int = 0,
+    quantize: bool = False,
+    debug: bool = False,
+):
+    cuts = load_manifest(manifest_path)
+    cuts = cuts.sort_by_duration() if sort_by_duration else cuts
+
+    if debug:
+        cuts = cuts[:100]
+
+    omnisense = OmniSenseVoiceSmall("iic/SenseVoiceSmall", quantize=quantize, device_id=device_id)
+
+    begin = time.time()
+    results = omnisense.transcribe(
+        [cut.recording.sources[0].source for cut in cuts],
+        language=language,
+        textnorm=textnorm,
+        batch_size=batch_size,
+        num_workers=num_workers,
+    )
+    compute_time = time.time() - begin
+
+    def _clean_punctuations(text):
+        return re.sub(r"[^\w\s]", "", text)
+
+    wers = []
+    for result, cut in zip(results, cuts):
+        cut_text = _clean_punctuations(cut.supervisions[0].text.lower())
+        wer = edit_distance(cut_text, _clean_punctuations(result.text.lower()))["total"] * 100 / len(cut_text)
+        wers.append(wer)
+
+    audio_time = sum(cut.duration for cut in cuts)
+    print(
+        f"Audio time: {audio_time:.2f}s Compute time: {compute_time:.2f}s RTF: {compute_time / audio_time:.2f} WER: {sum(wers)/len(wers):.4f}%"  # noqa
+    )
+
+
+if __name__ == "__main__":
+    _benchmark("benchmark/data/manifests/libritts/libritts_cuts_dev-clean.jsonl.gz", "auto", "woitn", device_id=0)

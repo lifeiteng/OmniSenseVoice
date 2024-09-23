@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 # -*- encoding: utf-8 -*-
-# Copyright FunASR (https://github.com/FunAudioLLM/SenseVoice). All Rights Reserved.
-#  MIT License  (https://opensource.org/licenses/MIT)
-
 
 import os.path
+import re
 from pathlib import Path
-from typing import List, Tuple, Union
+from typing import List, NamedTuple, Optional, Tuple, Union
 
 import librosa
 import numpy as np
@@ -15,8 +13,51 @@ from funasr_onnx.utils.frontend import WavFrontend
 from funasr_onnx.utils.sentencepiece_tokenizer import SentencepiecesTokenizer
 from funasr_onnx.utils.utils import OrtInferSession, get_logger, read_yaml
 from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
 
 logging = get_logger()
+
+
+# modified from Lhotse AlignmentItem
+class OmniTranscription(NamedTuple):
+    """
+    This class contains an alignment item, for example a word, along with its
+    start time (w.r.t. the start of recording) and duration. It can potentially
+    be used to store other kinds of alignment items, such as subwords, pdfid's etc.
+    """
+
+    language: str
+    emotion: str
+    event: str
+    textnorm: str
+
+    text: Optional[str] = None
+    # start: Optional[float] = None
+    # duration: Optional[float] = None
+
+    # # Score is an optional aligner-specific measure of confidence.
+    # # A simple measure can be an average probability of "symbol" across
+    # # frames covered by the AlignmentItem.
+    # score: Optional[float] = None
+
+    @property
+    def end(self) -> float:
+        return round(self.start + self.duration, ndigits=8)
+
+    @classmethod
+    def parse(cls, input_string: str):
+        """
+        Parse from SenseVoice output.
+        """
+        # '<|nospeech|><|EMO_UNKNOWN|><|Laughter|><|woitn|>'
+        # '<|en|><|NEUTRAL|><|Speech|><|withitn|>As you can see...'
+        pattern = r"<\|([^|]+)\|><\|([^|]+)\|><\|([^|]+)\|><\|([^|]+)\|>(.*)?"
+        match = re.match(pattern, input_string)
+        if match:
+            language, emotion, event, textnorm, text = match.groups()
+            return cls(language, emotion, event, textnorm, text)
+        else:
+            raise ValueError(f"Cannot parse the input string: {input_string}")
 
 
 class OmniSenseVoiceSmall:
@@ -81,7 +122,7 @@ class OmniSenseVoiceSmall:
         textnorm: str = "woitn",
         batch_size: int = 4,
         num_workers: int = 0,
-    ) -> List[str]:
+    ) -> List[OmniTranscription]:
         sampling_rate = self.frontend.opts.frame_opts.samp_freq
 
         if isinstance(audio, List):
@@ -90,7 +131,7 @@ class OmniSenseVoiceSmall:
             else:
                 audios = audio
         else:
-            pass
+            audios = [audio]
 
         dataset = NumpyDataset(audios)
 
@@ -103,8 +144,9 @@ class OmniSenseVoiceSmall:
             dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn, num_workers=num_workers
         )
 
-        results = [None] * len(audios)
-        for batch in dataloader:
+        # results = [None] * len(audios)
+        results = []
+        for batch in tqdm(dataloader, desc="Transcribing", total=len(audios) // batch_size):
             batch_size, feats, feats_len = batch
             ctc_logits, encoder_out_lens = self.ort_infer(
                 [
@@ -127,7 +169,7 @@ class OmniSenseVoiceSmall:
                 token_int = yseq[mask].tolist()
                 results.append(self.tokenizer.decode(token_int))
 
-        return results
+        return [OmniTranscription.parse(i) for i in results]
 
     def load_data(self, wav_content: Union[str, np.ndarray, List[str]], fs: int = None) -> List:
         def load_wav(path: str) -> np.ndarray:

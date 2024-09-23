@@ -4,10 +4,10 @@ Wrapper of [SenseVoice](https://github.com/FunAudioLLM/SenseVoice), optimized th
 
 ## Benchmark
 
-| Optimize       | WER ⬇️ | RTF ⬇️ |
-| -----          |-----   | ----- |
-| --batch-size 10| 1.17% | 0.12 |
-
+| Optimize       | WER ⬇️  | RTF ⬇️ | Speed Up |
+| -----          |-----   | ----- |  ----- |
+| baseline(onnx) | 1.17%  | 0.1200 |  1x   |
+| torch          | 1.23%  | 0.0046 | 26x   |
 
 
 ```
@@ -20,8 +20,12 @@ lhotse cut simple --force-eager -r benchmark/data/manifests/libritts/libritts_re
     -s benchmark/data/manifests/libritts/libritts_supervisions_dev-clean.jsonl.gz \
     benchmark/data/manifests/libritts/libritts_cuts_dev-clean.jsonl
 
-omnisense benchmark -s -d --num-workers 1 --device-id 1 --batch-size 10 --textnorm woitn --language en benchmark/data/manifests/libritts/libritts_cuts_dev-clean.jsonl
+omnisense benchmark -s -d --num-workers 2 --device-id 0 --batch-size 10 -
+-textnorm woitn --language en benchmark/data/manifests/libritts/libritts_cuts_dev-clean.jsonl
+# Audio time: 2109.1703s Compute time: 9.6817s RTF: 0.0046 WER: 1.23%
 
+omnisense benchmark -s --num-workers 4 --device-id 0 --batch-size 16 --textnorm woitn --language en benchmark/data/manifests/libritts/libritts_cuts_dev-clean.jsonl
+# Audio time: 32292.7525s Compute time: 67.5100s RTF: 0.0021 WER: 1.81%
 ```
 
 ## Install

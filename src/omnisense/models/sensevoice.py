@@ -77,7 +77,7 @@ class OmniSenseVoiceSmall:
         quantize: bool = False,
         cache_dir: str = None,
     ):
-        self.model, kwargs = SenseVoiceSmall.from_pretrained(model_dir, quantize=quantize)
+        model, kwargs = SenseVoiceSmall.from_pretrained(model_dir, quantize=quantize)
         del kwargs
 
         if not Path(model_dir).exists():
@@ -100,7 +100,9 @@ class OmniSenseVoiceSmall:
         if device_id != "-1":
             assert torch.cuda.is_available(), "CUDA is not available"
             self.device = f"cuda:{device_id}"
-        self.model.to(self.device)
+
+        model.eval()
+        self.model = model.to(self.device)
 
         self.blank_id = 0
         self.lid_dict = {"auto": 0, "zh": 3, "en": 4, "yue": 7, "ja": 11, "ko": 12, "nospeech": 13}
@@ -147,8 +149,8 @@ class OmniSenseVoiceSmall:
             return (
                 batch_size,
                 [item[0] for item in batch],
-                torch.from_numpy(feats).to(device),
-                torch.from_numpy(feats_len).to(device),
+                feats,
+                feats_len,
             )
 
         dataloader = DataLoader(
@@ -165,8 +167,8 @@ class OmniSenseVoiceSmall:
             batch_size, indexs, feats, feats_len = batch
 
             ctc_logits, encoder_out_lens = self.model.inference(
-                feats,
-                feats_len,
+                torch.from_numpy(feats).to(self.device),
+                torch.from_numpy(feats_len).to(self.device),
                 language,
                 textnorm,
             )

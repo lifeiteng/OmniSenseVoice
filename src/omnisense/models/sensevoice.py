@@ -12,14 +12,14 @@ import numpy as np
 import torch
 from funasr_onnx.utils.frontend import WavFrontend
 from funasr_onnx.utils.sentencepiece_tokenizer import SentencepiecesTokenizer
-from funasr_onnx.utils.utils import OrtInferSession, get_logger, read_yaml
+from funasr_onnx.utils.utils import read_yaml
 from lhotse.audio import Recording
 from lhotse.cut import Cut, MultiCut
 from lhotse.utils import Pathlike
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
-logging = get_logger()
+from .model import SenseVoiceSmall
 
 
 # modified from Lhotse AlignmentItem
@@ -76,25 +76,15 @@ class OmniSenseVoiceSmall:
         model_dir: Union[str, Path] = None,
         device_id: Union[str, int] = "-1",
         quantize: bool = False,
-        intra_op_num_threads: int = 4,
         cache_dir: str = None,
-        **kwargs,
     ):
+        model, kwargs = SenseVoiceSmall.from_pretrained(model_dir, quantize=quantize)
+        del kwargs
 
         if not Path(model_dir).exists():
             from modelscope.hub.snapshot_download import snapshot_download
 
             model_dir = snapshot_download(model_dir, cache_dir=cache_dir)
-
-        model_file = os.path.join(model_dir, "model.onnx")
-        if quantize:
-            model_file = os.path.join(model_dir, "model_quant.onnx")
-        if not os.path.exists(model_file):
-            print(".onnx does not exist, begin to export onnx")
-            from funasr import AutoModel
-
-            model = AutoModel(model=model_dir)
-            model_dir = model.export(type="onnx", quantize=quantize, **kwargs)
 
         config_file = os.path.join(model_dir, "config.yaml")
         cmvn_file = os.path.join(model_dir, "am.mvn")
@@ -105,15 +95,15 @@ class OmniSenseVoiceSmall:
         )
         config["frontend_conf"]["cmvn_file"] = cmvn_file
         self.frontend = WavFrontend(**config["frontend_conf"])
-
-        self.ort_infer = OrtInferSession(model_file, device_id, intra_op_num_threads=intra_op_num_threads)
-
         self.sampling_rate = self.frontend.opts.frame_opts.samp_freq
 
         self.device = "cpu"
         if device_id != "-1":
             assert torch.cuda.is_available(), "CUDA is not available"
             self.device = f"cuda:{device_id}"
+
+        model.eval()
+        self.model = model.to(self.device)
 
         self.blank_id = 0
         self.lid_dict = {"auto": 0, "zh": 3, "en": 4, "yue": 7, "ja": 11, "ko": 12, "nospeech": 13}
@@ -157,10 +147,15 @@ class OmniSenseVoiceSmall:
 
         dataset = NumpyDataset(audios, sampling_rate=self.sampling_rate)
 
-        def collate_fn(batch):
+        def collate_fn(batch, device=self.device):
             batch_size = len(batch)
             feats, feats_len = self.extract_feat([item[1] for item in batch])
-            return batch_size, [item[0] for item in batch], feats, feats_len
+            return (
+                batch_size,
+                [item[0] for item in batch],
+                feats,
+                feats_len,
+            )
 
         dataloader = DataLoader(
             dataset,
@@ -183,20 +178,16 @@ class OmniSenseVoiceSmall:
 
             start = time.time()
             batch_size, indexs, feats, feats_len = batch
-            ctc_logits, encoder_out_lens = self.ort_infer(
-                [
-                    feats,
-                    feats_len,
-                    np.array([self.lid_dict[language]] * batch_size, dtype=np.int32),
-                    np.array([self.textnorm_dict[textnorm]] * batch_size, dtype=np.int32),
-                ]
+
+            ctc_logits, encoder_out_lens = self.model.inference(
+                torch.from_numpy(feats).to(self.device),
+                torch.from_numpy(feats_len).to(self.device),
+                language,
+                textnorm,
             )
             timings["inference"] += time.time() - start
-
             start = time.time()
-            encoder_out_lens = encoder_out_lens.tolist()
-
-            ctc_logits = torch.from_numpy(ctc_logits).to(device=self.device)
+            encoder_out_lens = encoder_out_lens.cpu().numpy().tolist()
             ctc_maxids = ctc_logits.argmax(dim=-1)
             timings["postprocess"] += time.time() - start
 

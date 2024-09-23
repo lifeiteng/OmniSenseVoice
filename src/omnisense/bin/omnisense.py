@@ -146,7 +146,7 @@ def _benchmark(
 
     audio_time = sum(cut.duration for cut in cuts)
     print(
-        f"Audio time: {audio_time:.2f}s Compute time: {compute_time:.2f}s RTF: {compute_time / audio_time:.2f} WER: {sum(wers)/len(wers):.2f}%"  # noqa
+        f"Audio time: {audio_time:.4f}s Compute time: {compute_time:.4f}s RTF: {compute_time / audio_time:.4f} WER: {sum(wers)/len(wers):.2f}%"  # noqa
     )
 
 

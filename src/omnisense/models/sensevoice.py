@@ -3,6 +3,7 @@
 
 import os.path
 import re
+import time
 from pathlib import Path
 from typing import Any, List, NamedTuple, Optional, Tuple, Union
 
@@ -104,7 +105,9 @@ class OmniSenseVoiceSmall:
         )
         config["frontend_conf"]["cmvn_file"] = cmvn_file
         self.frontend = WavFrontend(**config["frontend_conf"])
+
         self.ort_infer = OrtInferSession(model_file, device_id, intra_op_num_threads=intra_op_num_threads)
+
         self.sampling_rate = self.frontend.opts.frame_opts.samp_freq
 
         self.device = "cpu"
@@ -128,6 +131,9 @@ class OmniSenseVoiceSmall:
         batch_size: int = 4,
         num_workers: int = 0,
     ) -> List[OmniTranscription]:
+        timings = {}
+        start = time.time()
+
         if isinstance(audio, List):
             indexs = list(range(len(audio)))
             if sort_by_duration:
@@ -166,7 +172,16 @@ class OmniSenseVoiceSmall:
         )
 
         results = [None] * len(audios)
+        timings["dataloader"] = time.time() - start
+        timings["inference"] = 0
+        timings["postprocess"] = 0
+        timings["decode"] = 0
+
+        start = time.time()
         for batch in tqdm(dataloader, desc="Transcribing", total=len(audios) // batch_size):
+            timings["dataloader"] += time.time() - start
+
+            start = time.time()
             batch_size, indexs, feats, feats_len = batch
             ctc_logits, encoder_out_lens = self.ort_infer(
                 [
@@ -176,11 +191,16 @@ class OmniSenseVoiceSmall:
                     np.array([self.textnorm_dict[textnorm]] * batch_size, dtype=np.int32),
                 ]
             )
+            timings["inference"] += time.time() - start
+
+            start = time.time()
             encoder_out_lens = encoder_out_lens.tolist()
 
             ctc_logits = torch.from_numpy(ctc_logits).to(device=self.device)
             ctc_maxids = ctc_logits.argmax(dim=-1)
+            timings["postprocess"] += time.time() - start
 
+            start = time.time()
             for b, index in enumerate(indexs):
                 yseq = ctc_maxids[b, : encoder_out_lens[b]]
                 yseq = torch.unique_consecutive(yseq, dim=-1)
@@ -188,7 +208,10 @@ class OmniSenseVoiceSmall:
                 mask = yseq != self.blank_id
                 token_int = yseq[mask].tolist()
                 results[index] = self.tokenizer.decode(token_int)
+            timings["decode"] += time.time() - start
+            start = time.time()
 
+        print(timings)
         return [OmniTranscription.parse(i) for i in results]
 
     def extract_feat(self, waveform_list: List[np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:

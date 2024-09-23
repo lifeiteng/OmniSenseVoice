@@ -16,10 +16,10 @@ setup(
         "funasr_onnx==0.4.1",
         "modelscope==1.18.0",
         "funasr==1.1.6",
+        "lhotse>=1.24.2",
     ],
     entry_points={
-        "console_scripts": [
-        ],
+        "console_scripts": ["omnisense=omnisense.bin:cli"],
     },
     include_package_data=True,
 )

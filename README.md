@@ -5,7 +5,16 @@ Wrapper of [SenseVoice](https://github.com/FunAudioLLM/SenseVoice), optimized th
 ## Benchmark
 * TBD
 ```
+# LibriTTS
+DIR=benchmark/data
+lhotse download libritts -p dev-clean benchmark/dataLibriTTS
+lhotse prepare libritts -p dev-clean benchmark/data/LibriTTS/LibriTTS benchmark/data/manifests/libritts
 
+lhotse cut simple -r benchmark/data/manifests/libritts/libritts_recordings_dev-clean.jsonl.gz \
+    -s benchmark/data/manifests/libritts/libritts_supervisions_dev-clean.jsonl.gz \
+    benchmark/data/manifests/libritts/libritts_cuts_dev-clean.jsonl.gz
+
+omnisense benchmark --textnorm woitn --language en benchmark/data/manifests/libritts/libritts_cuts_dev-clean.jsonl.gz
 ```
 
 ## Install

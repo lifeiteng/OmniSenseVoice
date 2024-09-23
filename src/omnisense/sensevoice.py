@@ -62,6 +62,11 @@ class OmniSenseVoiceSmall:
         self.frontend = WavFrontend(**config["frontend_conf"])
         self.ort_infer = OrtInferSession(model_file, device_id, intra_op_num_threads=intra_op_num_threads)
 
+        self.device = "cpu"
+        if device_id != "-1":
+            assert torch.cuda.is_available(), "CUDA is not available"
+            self.device = f"cuda:{device_id}"
+
         self.blank_id = 0
         self.lid_dict = {"auto": 0, "zh": 3, "en": 4, "yue": 7, "ja": 11, "ko": 12, "nospeech": 13}
         self.lid_int_dict = {24884: 3, 24885: 4, 24888: 7, 24892: 11, 24896: 12, 24992: 13}
@@ -111,7 +116,7 @@ class OmniSenseVoiceSmall:
             )
             encoder_out_lens = encoder_out_lens.tolist()
 
-            ctc_logits = torch.from_numpy(ctc_logits).to(device="cpu")
+            ctc_logits = torch.from_numpy(ctc_logits).to(device=self.device)
             ctc_maxids = ctc_logits.argmax(dim=-1)
 
             for b in range(batch_size):

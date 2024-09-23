@@ -4,7 +4,7 @@
 import os.path
 import re
 from pathlib import Path
-from typing import List, NamedTuple, Optional, Tuple, Union
+from typing import Any, List, NamedTuple, Optional, Tuple, Union
 
 import librosa
 import numpy as np
@@ -12,6 +12,9 @@ import torch
 from funasr_onnx.utils.frontend import WavFrontend
 from funasr_onnx.utils.sentencepiece_tokenizer import SentencepiecesTokenizer
 from funasr_onnx.utils.utils import OrtInferSession, get_logger, read_yaml
+from lhotse.audio import Recording
+from lhotse.cut import Cut, MultiCut
+from lhotse.utils import Pathlike
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
@@ -102,6 +105,7 @@ class OmniSenseVoiceSmall:
         config["frontend_conf"]["cmvn_file"] = cmvn_file
         self.frontend = WavFrontend(**config["frontend_conf"])
         self.ort_infer = OrtInferSession(model_file, device_id, intra_op_num_threads=intra_op_num_threads)
+        self.sampling_rate = self.frontend.opts.frame_opts.samp_freq
 
         self.device = "cpu"
         if device_id != "-1":
@@ -117,37 +121,53 @@ class OmniSenseVoiceSmall:
     @torch.no_grad()
     def transcribe(
         self,
-        audio: Union[str, List[str], np.ndarray, List[np.ndarray]],
+        audio: Union[str, List[str], np.ndarray, List[np.ndarray], List[Cut]],
         language: str = "auto",
         textnorm: str = "woitn",
+        sort_by_duration: bool = True,
         batch_size: int = 4,
         num_workers: int = 0,
     ) -> List[OmniTranscription]:
-        sampling_rate = self.frontend.opts.frame_opts.samp_freq
-
         if isinstance(audio, List):
-            if isinstance(audio[0], str):
-                audios = [librosa.load(path, sr=sampling_rate)[0] for path in audio]
+            indexs = list(range(len(audio)))
+            if sort_by_duration:
+                if isinstance(audio[0], Cut):
+                    audios = sorted(zip(indexs, audio), key=lambda x: x[1].duration, reverse=False)
+                elif isinstance(audio[0], str):
+                    recordings = [Recording.from_file(i) for i in audio]
+                    cuts = [
+                        MultiCut(id="", recording=recording, start=0, duration=recording.duration, channel=0)
+                        for recording in recordings
+                    ]
+                    audios = sorted(zip(indexs, cuts), key=lambda x: x[1].duration, reverse=False)
+                elif isinstance(audio[0], np.ndarray):
+                    audios = sorted(zip(indexs, audio), key=lambda x: x[1].shape[0], reverse=False)
+                else:
+                    raise ValueError(f"Unsupported audio type {type(audio[0])}")
             else:
-                audios = audio
+                audios = list(enumerate(audio))
         else:
-            audios = [audio]
+            audios = [(0, audio)]
 
-        dataset = NumpyDataset(audios)
+        dataset = NumpyDataset(audios, sampling_rate=self.sampling_rate)
 
         def collate_fn(batch):
             batch_size = len(batch)
-            feats, feats_len = self.extract_feat(batch)
-            return batch_size, feats, feats_len
+            feats, feats_len = self.extract_feat([item[1] for item in batch])
+            return batch_size, [item[0] for item in batch], feats, feats_len
 
         dataloader = DataLoader(
-            dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn, num_workers=num_workers
+            dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            collate_fn=collate_fn,
+            num_workers=num_workers,
+            prefetch_factor=4 if num_workers > 0 else None,
         )
 
-        # results = [None] * len(audios)
-        results = []
+        results = [None] * len(audios)
         for batch in tqdm(dataloader, desc="Transcribing", total=len(audios) // batch_size):
-            batch_size, feats, feats_len = batch
+            batch_size, indexs, feats, feats_len = batch
             ctc_logits, encoder_out_lens = self.ort_infer(
                 [
                     feats,
@@ -161,13 +181,13 @@ class OmniSenseVoiceSmall:
             ctc_logits = torch.from_numpy(ctc_logits).to(device=self.device)
             ctc_maxids = ctc_logits.argmax(dim=-1)
 
-            for b in range(batch_size):
+            for b, index in enumerate(indexs):
                 yseq = ctc_maxids[b, : encoder_out_lens[b]]
                 yseq = torch.unique_consecutive(yseq, dim=-1)
 
                 mask = yseq != self.blank_id
                 token_int = yseq[mask].tolist()
-                results.append(self.tokenizer.decode(token_int))
+                results[index] = self.tokenizer.decode(token_int)
 
         return [OmniTranscription.parse(i) for i in results]
 
@@ -211,11 +231,23 @@ class OmniSenseVoiceSmall:
 
 
 class NumpyDataset(Dataset):
-    def __init__(self, segments: List[np.ndarray]):
+    def __init__(self, segments: List[Tuple[int, Any]], sampling_rate: int):
         self.segments = segments
+        self.sampling_rate = sampling_rate
 
     def __len__(self):
         return len(self.segments)
 
     def __getitem__(self, idx):
-        return self.segments[idx]
+        segment = self.segments[idx]
+        if isinstance(segment[1], np.ndarray):
+            audio = segment
+        elif isinstance(segment[1], Pathlike):
+            audio = (segment[0], librosa.load(segment, sr=self.sampling_rate, mono=True)[0])
+        elif isinstance(segment[1], Cut):
+            audio = (segment[0], segment[1].resample(self.sampling_rate).load_audio()[0])
+        else:
+            raise ValueError(f"Unsupported audio type {type(segment)}")
+
+        assert audio[1].ndim == 1, f"Only support mono audio, but got {audio[1].ndim} channels"
+        return audio

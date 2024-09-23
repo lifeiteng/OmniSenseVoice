@@ -117,9 +117,9 @@ def _benchmark(
     debug: bool = False,
 ):
     cuts = load_manifest(manifest_path)
-    cuts = cuts.sort_by_duration() if sort_by_duration else cuts
 
     if debug:
+        cuts = cuts.sort_by_duration() if sort_by_duration else cuts
         cuts = cuts[:100]
 
     omnisense = OmniSenseVoiceSmall("iic/SenseVoiceSmall", quantize=quantize, device_id=device_id)
@@ -129,6 +129,7 @@ def _benchmark(
         [cut.recording.sources[0].source for cut in cuts],
         language=language,
         textnorm=textnorm,
+        sort_by_duration=sort_by_duration,
         batch_size=batch_size,
         num_workers=num_workers,
     )
@@ -145,7 +146,7 @@ def _benchmark(
 
     audio_time = sum(cut.duration for cut in cuts)
     print(
-        f"Audio time: {audio_time:.2f}s Compute time: {compute_time:.2f}s RTF: {compute_time / audio_time:.2f} WER: {sum(wers)/len(wers):.4f}%"  # noqa
+        f"Audio time: {audio_time:.2f}s Compute time: {compute_time:.2f}s RTF: {compute_time / audio_time:.2f} WER: {sum(wers)/len(wers):.2f}%"  # noqa
     )
 
 

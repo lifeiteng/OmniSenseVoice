@@ -6,8 +6,7 @@ Wrapper of [SenseVoice](https://github.com/FunAudioLLM/SenseVoice), optimized th
 
 | Optimize       | WER ⬇️ | RTF ⬇️ |
 | -----          |-----   | ----- |
-|  xx            | xx    | xxx|
-| --batch-size 10|  | |
+| --batch-size 10| 1.17% | 0.12 |
 
 
 
@@ -21,7 +20,7 @@ lhotse cut simple --force-eager -r benchmark/data/manifests/libritts/libritts_re
     -s benchmark/data/manifests/libritts/libritts_supervisions_dev-clean.jsonl.gz \
     benchmark/data/manifests/libritts/libritts_cuts_dev-clean.jsonl
 
-omnisense benchmark -s -d --device-id 0 --batch-size 10 --textnorm woitn --language en benchmark/data/manifests/libritts/libritts_cuts_dev-clean.jsonl
+omnisense benchmark -s -d --num-workers 1 --device-id 1 --batch-size 10 --textnorm woitn --language en benchmark/data/manifests/libritts/libritts_cuts_dev-clean.jsonl
 
 ```
 

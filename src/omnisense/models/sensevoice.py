@@ -104,7 +104,9 @@ class OmniSenseVoiceSmall:
         )
         config["frontend_conf"]["cmvn_file"] = cmvn_file
         self.frontend = WavFrontend(**config["frontend_conf"])
+        self.frontend.opts.frame_opts.dither = 0
         self.ort_infer = OrtInferSession(model_file, device_id, intra_op_num_threads=intra_op_num_threads)
+
         self.sampling_rate = self.frontend.opts.frame_opts.samp_freq
 
         self.device = "cpu"

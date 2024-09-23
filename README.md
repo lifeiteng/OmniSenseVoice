@@ -4,11 +4,12 @@ Wrapper of [SenseVoice](https://github.com/FunAudioLLM/SenseVoice), optimized th
 
 ## Benchmark
 
-| Optimize       | WER ⬇️ | RTF ⬇️ |
-| -----          |-----   | ----- |
-| --batch-size 10| 1.17% | 0.12 |
+`omnisense benchmark -s -d --num-workers 2 --device-id 0 --batch-size 10 --textnorm woitn --language en benchmark/data/manifests/libritts/libritts_cuts_dev-clean.jsonl`
 
-
+| Optimize       | WER ⬇️ | RTF ⬇️ | Speed Up |
+| -------------- | ------ | ------ | -------- |
+| baseline(onnx) | 1.26%  | 0.1200 | 1x       |
+| torch          | 1.49%  | 0.0022 | 54x      |
 
 ```
 # LibriTTS
@@ -25,16 +26,20 @@ omnisense benchmark -s -d --num-workers 1 --device-id 1 --batch-size 10 --textno
 ```
 
 ## Install
+
 ```
 pip install .
 ```
 
 ## Contributing
+
 #### step1: set code Formatting
+
 ```
 pip install pre-commit==3.6.0
 pre-commit install
 ```
 
 #### step2: make a Pull Request
+
 😊😊

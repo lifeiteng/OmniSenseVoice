@@ -83,6 +83,7 @@ class OmniSenseVoiceSmall:
 
         self.tokenizer = SentencepiecesTokenizer(bpemodel=kwargs["tokenizer_conf"]["bpemodel"])
         self.frontend = WavFrontend(**config["frontend_conf"])
+        self.frontend.opts.frame_opts.dither = 0
         self.sampling_rate = self.frontend.opts.frame_opts.samp_freq
 
         self.device = "cpu"

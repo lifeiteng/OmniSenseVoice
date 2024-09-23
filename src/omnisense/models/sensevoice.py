@@ -46,6 +46,32 @@ class OmniTranscription(NamedTuple):
     def end(self) -> float:
         return round(self.start + self.duration, ndigits=8)
 
+    def to_dict(self) -> dict:
+        return {
+            "language": self.language,
+            "emotion": self.emotion,
+            "event": self.event,
+            "textnorm": self.textnorm,
+            "text": self.text,
+            # "start": self.start,
+            # "duration": self.duration,
+            # "end": self.end,
+            # "score": self.score,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        return OmniTranscription(
+            language=data["language"],
+            emotion=data["emotion"],
+            event=data["event"],
+            textnorm=data["textnorm"],
+            text=data.get("text"),
+            # start=data.get("start"),
+            # duration=data.get("duration"),
+            # score=data.get("score"),
+        )
+
     @classmethod
     def parse(cls, input_string: str):
         """

@@ -8,8 +8,7 @@ Wrapper of [SenseVoice](https://github.com/FunAudioLLM/SenseVoice), optimized th
 
 | Optimize       | WER ⬇️ | RTF ⬇️ | Speed Up |
 | -------------- | ------ | ------ | -------- |
-| baseline(onnx) | 1.26%  | 0.1200 | 1x       |
-| torch          | 1.49%  | 0.0022 | 54x      |
+| baseline(onnx) | 4.47%  | 0.1200 | 1x       |
 
 ```
 # LibriTTS

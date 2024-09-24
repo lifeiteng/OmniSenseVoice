@@ -40,23 +40,30 @@ def ctc_greedy_search(
     topk_index = topk_index.masked_fill_(mask, 0)  # (B, maxlen)
     hyps = [hyp.tolist() for hyp in topk_index]
 
-    def get_first_tokens(tokens: List[int]) -> List[bool]:
+    start_token = b"\xe2\x96\x81".decode()  # '_'
+
+    def get_first_tokens(tokens: List[str], blank_token: str) -> List[bool]:
         is_first_token = []
         first_tokens = []
         for t in range(len(tokens)):
-            if tokens[t] != 0 and (t == 0 or tokens[t - 1] != tokens[t]):
+            if tokens[t] != blank_token and (t == 0 or tokens[t - 1] != tokens[t]):
+                is_first_token.append(True)
+                first_tokens.append(tokens[t])
+            elif t and tokens[t - 1] == tokens[t] and tokens[t].startswith(start_token):
                 is_first_token.append(True)
                 first_tokens.append(tokens[t])
             else:
                 is_first_token.append(False)
         return first_tokens, is_first_token
 
+    blank_token = sp.id_to_piece(0)
+
     utt_time_pairs = []
     utt_words = []
     for utt in range(len(hyps)):
-        first_tokens, is_first_token = get_first_tokens(hyps[utt])
         all_tokens = sp.id_to_piece(hyps[utt])
-        index_pairs = parse_bpe_start_end_pairs(all_tokens, is_first_token)
+        first_tokens, is_first_token = get_first_tokens(all_tokens, blank_token=blank_token)
+        index_pairs = parse_bpe_start_end_pairs(all_tokens, is_first_token, blank_token=blank_token)
         words = sp.decode(first_tokens).split()
         assert len(index_pairs) == len(words), (
             len(index_pairs),
@@ -134,7 +141,7 @@ def convert_timestamp(
     return time
 
 
-def parse_bpe_start_end_pairs(tokens: List[str], is_first_token: List[bool]) -> List[Tuple[int, int]]:
+def parse_bpe_start_end_pairs(tokens: List[str], is_first_token: List[bool], blank_token: str) -> List[Tuple[int, int]]:
     """Parse pairs of start and end frame indexes for each word.
 
     Args:
@@ -150,7 +157,7 @@ def parse_bpe_start_end_pairs(tokens: List[str], is_first_token: List[bool]) -> 
     assert len(tokens) == len(is_first_token), (len(tokens), len(is_first_token))
 
     start_token = b"\xe2\x96\x81".decode()  # '_'
-    blank_token = "<blk>"
+    # blank_token = "<blk>"
 
     non_blank_idx = [i for i in range(len(tokens)) if tokens[i] != blank_token]
     num_non_blank = len(non_blank_idx)

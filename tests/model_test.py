@@ -10,7 +10,7 @@ model = SenseVoiceSmall(model_dir, batch_size=10, quantize=False, device_id=1)
 
 
 # inference
-wav_or_scp = ["tests/example.wav"]
+wav_or_scp = ["tests/data/example.wav"]
 for textnorm in ["woitn", "withitn"]:
     print(f"\n====== Text normalization: {textnorm} ======")
     start_time = time.time()
@@ -26,7 +26,7 @@ model = OmniSenseVoiceSmall(model_dir, quantize=False, device_id=1)
 
 
 # inference
-wav_or_scp = ["tests/Laughter.wav", "tests/Cry.wav", "tests/Applause.wav"]
+wav_or_scp = ["tests/data/Laughter.wav", "tests/data/Cry.wav", "tests/data/Applause.wav"]
 for textnorm in ["woitn", "withitn"]:
     print(f"\n====== Text normalization: {textnorm} ======")
     start_time = time.time()
@@ -37,7 +37,7 @@ for textnorm in ["woitn", "withitn"]:
     print([OmniTranscription.parse(i) for i in res])
 
 
-wav_or_scp = ["tests/example.wav"]
+wav_or_scp = ["tests/data/example.wav"]
 for textnorm in ["woitn", "withitn"]:
     print(f"\n====== Text normalization: {textnorm} ======")
     start_time = time.time()

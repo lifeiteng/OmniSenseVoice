@@ -13,11 +13,12 @@ from funasr_onnx.utils.sentencepiece_tokenizer import SentencepiecesTokenizer
 from funasr_onnx.utils.utils import read_yaml
 from lhotse.audio import Recording
 from lhotse.cut import Cut, MultiCut
-from lhotse.utils import Pathlike
+from lhotse.supervision import AlignmentItem
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
 from .model import SenseVoiceSmall
+from .k2_utils import ctc_greedy_search
 
 
 # modified from Lhotse AlignmentItem
@@ -36,6 +37,8 @@ class OmniTranscription(NamedTuple):
     text: Optional[str] = None
     # start: Optional[float] = None
     # duration: Optional[float] = None
+
+    words: Optional[List[AlignmentItem]] = None
 
     # # Score is an optional aligner-specific measure of confidence.
     # # A simple measure can be an average probability of "symbol" across
@@ -130,6 +133,7 @@ class OmniSenseVoiceSmall:
         textnorm: str = "woitn",
         sort_by_duration: bool = True,
         batch_size: int = 4,
+        timestamps: bool = False,
         num_workers: int = 0,
     ) -> List[OmniTranscription]:
         if isinstance(audio, List):
@@ -184,17 +188,36 @@ class OmniSenseVoiceSmall:
                 language,
                 textnorm,
             )
-            encoder_out_lens = encoder_out_lens.cpu().numpy().tolist()
-            ctc_maxids = ctc_logits.argmax(dim=-1)
+            if timestamps:
+                # decode first 4 frames
+                ctc_maxids = ctc_logits[:, :4].argmax(dim=-1)
+                for b, index in enumerate(indexs):
+                    yseq = ctc_maxids[b, :4]
+                    token_int = yseq.tolist()
+                    results[index] = OmniTranscription.parse(self.tokenizer.decode(token_int))
 
-            for b, index in enumerate(indexs):
-                yseq = ctc_maxids[b, : encoder_out_lens[b]]
-                yseq = torch.unique_consecutive(yseq, dim=-1)
+                utt_time_pairs, utt_words = ctc_greedy_search(ctc_logits[:, 4:], encoder_out_lens - 4,
+                                  sp=self.tokenizer.sp,
+                                  subsampling_factor=6,
+                                  frame_shift_ms=self.frontend.opts.frame_opts.frame_shift_ms)
+                for k, (result, time_pairs, words) in enumerate(zip([results[index] for index in indexs], utt_time_pairs, utt_words)):
+                    results[indexs[k]] = result._replace(words=[AlignmentItem(symbol=word, start=pair[0], duration=round(pair[1] - pair[0], ndigits=4)) for (pair, word) in zip(time_pairs, words)],
+                                                         text=" ".join(words))
+            else:
+                encoder_out_lens = encoder_out_lens.cpu().numpy().tolist()
+ 
+                ctc_maxids = ctc_logits.argmax(dim=-1)
 
-                mask = yseq != self.blank_id
-                token_int = yseq[mask].tolist()
-                results[index] = self.tokenizer.decode(token_int)
+                for b, index in enumerate(indexs):
+                    yseq = ctc_maxids[b, : encoder_out_lens[b]]
+                    yseq = torch.unique_consecutive(yseq, dim=-1)
+                    mask = yseq != self.blank_id
+                    token_int = yseq[mask].tolist()
+                    results[index] = self.tokenizer.decode(token_int)
 
+        if timestamps:
+            return results
+        
         return [OmniTranscription.parse(i) for i in results]
 
     def extract_feat(self, waveform_list: List[np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
@@ -232,7 +255,7 @@ class NumpyDataset(Dataset):
         segment = self.segments[idx]
         if isinstance(segment[1], np.ndarray):
             audio = segment
-        elif isinstance(segment[1], Pathlike):
+        elif isinstance(segment[1], str) or isinstance(segment[1], Path):
             audio = (segment[0], librosa.load(segment[1], sr=self.sampling_rate, mono=True)[0])
         elif isinstance(segment[1], Cut):
             audio = (segment[0], segment[1].resample(self.sampling_rate).load_audio()[0])

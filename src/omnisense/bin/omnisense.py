@@ -40,15 +40,24 @@ from .cli_base import cli
     is_flag=True,
     help="Use quantized model.",
 )
+@click.option(
+    "-t",
+    "--timestamps",
+    is_flag=True,
+    help="Return word level timestamps."
+)
 def transcribe(
     audio_path: Pathlike,
     language: str,
     textnorm: str,
     device_id: int,
-    quantize: str,
+    quantize: bool,
+    timestamps: bool
 ):
     omnisense = OmniSenseVoiceSmall("iic/SenseVoiceSmall", quantize=quantize, device_id=device_id)
-    result = omnisense.transcribe(audio_path, language=language, textnorm=textnorm)
+    result = omnisense.transcribe(audio_path, language=language, textnorm=textnorm,
+                                  batch_size=8,
+                                  timestamps=timestamps)
     print(result[0].text)
 
 

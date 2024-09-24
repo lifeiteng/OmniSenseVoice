@@ -151,7 +151,7 @@ def _benchmark(
     compute_time = time.time() - begin
 
     def _clean_punctuations(text):
-        return re.sub(r"[^\w\s]", "", text)
+        return re.sub(r"[^\w\s]", "", text).split()
 
     wers = []
     for result, cut in zip(results, cuts):

@@ -1,3 +1,5 @@
+# modified from https://github.com/FunAudioLLM/SenseVoice/blob/main/model.py
+
 from typing import Optional
 
 import torch

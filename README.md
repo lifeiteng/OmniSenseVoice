@@ -22,10 +22,10 @@ Key Options:
 ## Benchmark
 `omnisense benchmark -s -d --num-workers 2 --device-id 0 --batch-size 10 --textnorm woitn --language en benchmark/data/manifests/libritts/libritts_cuts_dev-clean.jsonl`
 
-| Optimize       | WER ⬇️  | RTF ⬇️ | Speed Up 🔥 |
-| -----          |-----   | ----- |  ----- |
-| baseline(onnx) | 4.47%  | 0.1200 |  1x   |
-| torch          | 5.02%  | 0.0022 | 50x   |
+| Optimize       | GPU           | WER ⬇️  | RTF ⬇️ | Speed Up 🔥 |
+| -----          |-----          |-----   | ----- |  ----- |
+| baseline(onnx) | NVIDIA L4 GPU | 4.47%  | 0.1200 |  1x   |
+| torch          | NVIDIA L4 GPU | 5.02%  | 0.0022 | 50x   |
 
 * With Omni SenseVoice, experience up to 50x faster processing without sacrificing accuracy.
 

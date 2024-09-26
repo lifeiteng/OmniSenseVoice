@@ -22,11 +22,14 @@ Key Options:
 ## Benchmark
 `omnisense benchmark -s -d --num-workers 2 --device-id 0 --batch-size 10 --textnorm woitn --language en benchmark/data/manifests/libritts/libritts_cuts_dev-clean.jsonl`
 
-| Optimize       | GPU           | WER ⬇️  | RTF ⬇️ | Speed Up 🔥 |
-| -----          |-----          |-----   | ----- |  ----- |
-| baseline(onnx) | NVIDIA L4 GPU | 4.47%  | 0.1200 |  1x   |
-| torch          | NVIDIA L4 GPU | 5.02%  | 0.0022 | 50x   |
+| Optimize        | test set        | GPU           | WER ⬇️  | RTF ⬇️ | Speed Up 🔥 |
+| -----           |-----            |-----          |-----   | ----- |  ----- |
+| onnx            |  dev-clean[:100]| NVIDIA L4 GPU | 4.47%  | 0.1200 |  1x   |
+| torch           |  dev-clean[:100]| NVIDIA L4 GPU | 5.02%  | 0.0022 | 50x   |
+| onnx `fix cudnn`|  dev-clean[all] | NVIDIA L4 GPU | 5.60%  | 0.0027 | 50x   |
+| torch           |  dev-clean[all] | NVIDIA L4 GPU | 6.39%  | 0.0019 | 50x   |
 
+* `fix cudnn`: `cudnn_conv_algo_search: DEFAULT`
 * With Omni SenseVoice, experience up to 50x faster processing without sacrificing accuracy.
 
 

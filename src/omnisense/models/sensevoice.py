@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- encoding: utf-8 -*-
 
-import os.path
 import re
 import time
 from pathlib import Path
@@ -15,10 +14,11 @@ from funasr_onnx.utils.sentencepiece_tokenizer import SentencepiecesTokenizer
 from funasr_onnx.utils.utils import read_yaml
 from lhotse.audio import Recording
 from lhotse.cut import Cut, MultiCut
-from lhotse.utils import Pathlike
+from lhotse.supervision import AlignmentItem
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
+from .k2_utils import ctc_greedy_search
 from .model import SenseVoiceSmall
 
 
@@ -39,6 +39,8 @@ class OmniTranscription(NamedTuple):
     # start: Optional[float] = None
     # duration: Optional[float] = None
 
+    words: Optional[List[AlignmentItem]] = None
+
     # # Score is an optional aligner-specific measure of confidence.
     # # A simple measure can be an average probability of "symbol" across
     # # frames covered by the AlignmentItem.
@@ -47,6 +49,32 @@ class OmniTranscription(NamedTuple):
     @property
     def end(self) -> float:
         return round(self.start + self.duration, ndigits=8)
+
+    def to_dict(self) -> dict:
+        return {
+            "language": self.language,
+            "emotion": self.emotion,
+            "event": self.event,
+            "textnorm": self.textnorm,
+            "text": self.text,
+            # "start": self.start,
+            # "duration": self.duration,
+            # "end": self.end,
+            # "score": self.score,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        return OmniTranscription(
+            language=data["language"],
+            emotion=data["emotion"],
+            event=data["event"],
+            textnorm=data["textnorm"],
+            text=data.get("text"),
+            # start=data.get("start"),
+            # duration=data.get("duration"),
+            # score=data.get("score"),
+        )
 
     @classmethod
     def parse(cls, input_string: str):
@@ -76,29 +104,20 @@ class OmniSenseVoiceSmall:
         model_dir: Union[str, Path] = None,
         device_id: Union[str, int] = "-1",
         quantize: bool = False,
-        cache_dir: str = None,
     ):
         model, kwargs = SenseVoiceSmall.from_pretrained(model_dir, quantize=quantize)
-        del kwargs
+        device_id = int(device_id)
 
-        if not Path(model_dir).exists():
-            from modelscope.hub.snapshot_download import snapshot_download
-
-            model_dir = snapshot_download(model_dir, cache_dir=cache_dir)
-
-        config_file = os.path.join(model_dir, "config.yaml")
-        cmvn_file = os.path.join(model_dir, "am.mvn")
+        config_file = kwargs["config"]
         config = read_yaml(config_file)
 
-        self.tokenizer = SentencepiecesTokenizer(
-            bpemodel=os.path.join(model_dir, "chn_jpn_yue_eng_ko_spectok.bpe.model")
-        )
-        config["frontend_conf"]["cmvn_file"] = cmvn_file
+        self.tokenizer = SentencepiecesTokenizer(bpemodel=kwargs["tokenizer_conf"]["bpemodel"])
         self.frontend = WavFrontend(**config["frontend_conf"])
+        self.frontend.opts.frame_opts.dither = 0
         self.sampling_rate = self.frontend.opts.frame_opts.samp_freq
 
         self.device = "cpu"
-        if device_id != "-1":
+        if device_id != -1:
             assert torch.cuda.is_available(), "CUDA is not available"
             self.device = f"cuda:{device_id}"
 
@@ -106,10 +125,6 @@ class OmniSenseVoiceSmall:
         self.model = model.to(self.device)
 
         self.blank_id = 0
-        self.lid_dict = {"auto": 0, "zh": 3, "en": 4, "yue": 7, "ja": 11, "ko": 12, "nospeech": 13}
-        self.lid_int_dict = {24884: 3, 24885: 4, 24888: 7, 24892: 11, 24896: 12, 24992: 13}
-        self.textnorm_dict = {"withitn": 14, "woitn": 15}
-        self.textnorm_int_dict = {25016: 14, 25017: 15}
 
     @torch.no_grad()
     def transcribe(
@@ -119,6 +134,7 @@ class OmniSenseVoiceSmall:
         textnorm: str = "woitn",
         sort_by_duration: bool = True,
         batch_size: int = 4,
+        timestamps: bool = False,
         num_workers: int = 0,
     ) -> List[OmniTranscription]:
         timings = {}
@@ -187,22 +203,51 @@ class OmniSenseVoiceSmall:
             )
             timings["inference"] += time.time() - start
             start = time.time()
-            encoder_out_lens = encoder_out_lens.cpu().numpy().tolist()
-            ctc_maxids = ctc_logits.argmax(dim=-1)
-            timings["postprocess"] += time.time() - start
 
-            start = time.time()
-            for b, index in enumerate(indexs):
-                yseq = ctc_maxids[b, : encoder_out_lens[b]]
-                yseq = torch.unique_consecutive(yseq, dim=-1)
+            if timestamps:
+                # decode first 4 frames
+                ctc_maxids = ctc_logits[:, :4].argmax(dim=-1)
+                for b, index in enumerate(indexs):
+                    yseq = ctc_maxids[b, :4]
+                    token_int = yseq.tolist()
+                    results[index] = OmniTranscription.parse(self.tokenizer.decode(token_int))
 
-                mask = yseq != self.blank_id
-                token_int = yseq[mask].tolist()
-                results[index] = self.tokenizer.decode(token_int)
-            timings["decode"] += time.time() - start
-            start = time.time()
+                utt_time_pairs, utt_words = ctc_greedy_search(
+                    ctc_logits[:, 4:],
+                    encoder_out_lens - 4,
+                    sp=self.tokenizer.sp,
+                    subsampling_factor=6,
+                    frame_shift_ms=self.frontend.opts.frame_opts.frame_shift_ms,
+                )
+                for k, (result, time_pairs, words) in enumerate(
+                    zip([results[index] for index in indexs], utt_time_pairs, utt_words)
+                ):
+                    results[indexs[k]] = result._replace(
+                        words=[
+                            AlignmentItem(symbol=word, start=pair[0], duration=round(pair[1] - pair[0], ndigits=4))
+                            for (pair, word) in zip(time_pairs, words)
+                        ],
+                        text=" ".join(words),
+                    )
+            else:
+                encoder_out_lens = encoder_out_lens.cpu().numpy().tolist()
+                ctc_maxids = ctc_logits.argmax(dim=-1)
+                timings["postprocess"] += time.time() - start
 
-        print(timings)
+                start = time.time()
+                for b, index in enumerate(indexs):
+                    yseq = ctc_maxids[b, : encoder_out_lens[b]]
+                    yseq = torch.unique_consecutive(yseq, dim=-1)
+                    mask = yseq != self.blank_id
+                    token_int = yseq[mask].tolist()
+                    results[index] = self.tokenizer.decode(token_int)
+
+                timings["decode"] += time.time() - start
+                start = time.time()
+
+        if timestamps:
+            return results
+
         return [OmniTranscription.parse(i) for i in results]
 
     def extract_feat(self, waveform_list: List[np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
@@ -240,8 +285,8 @@ class NumpyDataset(Dataset):
         segment = self.segments[idx]
         if isinstance(segment[1], np.ndarray):
             audio = segment
-        elif isinstance(segment[1], Pathlike):
-            audio = (segment[0], librosa.load(segment, sr=self.sampling_rate, mono=True)[0])
+        elif isinstance(segment[1], str) or isinstance(segment[1], Path):
+            audio = (segment[0], librosa.load(segment[1], sr=self.sampling_rate, mono=True)[0])
         elif isinstance(segment[1], Cut):
             audio = (segment[0], segment[1].resample(self.sampling_rate).load_audio()[0])
         else:

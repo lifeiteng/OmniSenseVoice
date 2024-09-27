@@ -1,4 +1,3 @@
-import logging
 import re
 import time
 
@@ -29,12 +28,37 @@ from .cli_base import cli
     default="withitn",
     help="Text normalization.",
 )
+@click.option(
+    "-g",
+    "--device-id",
+    type=int,
+    default=-1,
+    help="GPU ID to run the model(defualt: -1 use cpu).",
+)
+@click.option(
+    "--quantize",
+    is_flag=True,
+    help="Use quantized model.",
+)
+@click.option(
+    "-t",
+    "--timestamps",
+    is_flag=True,
+    help="Return word level timestamps."
+)
 def transcribe(
     audio_path: Pathlike,
     language: str,
     textnorm: str,
+    device_id: int,
+    quantize: bool,
+    timestamps: bool
 ):
-    pass
+    omnisense = OmniSenseVoiceSmall("iic/SenseVoiceSmall", quantize=quantize, device_id=device_id)
+    result = omnisense.transcribe(audio_path, language=language, textnorm=textnorm,
+                                  batch_size=8,
+                                  timestamps=timestamps)
+    print(result[0].text)
 
 
 @cli.command()
@@ -136,7 +160,7 @@ def _benchmark(
     compute_time = time.time() - begin
 
     def _clean_punctuations(text):
-        return re.sub(r"[^\w\s]", "", text)
+        return re.sub(r"[^\w\s]", "", text).split()
 
     wers = []
     for result, cut in zip(results, cuts):

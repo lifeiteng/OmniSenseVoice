@@ -161,6 +161,9 @@ class OmniSenseVoiceSmall:
         else:
             audios = [(0, audio)]
 
+        timings["make_cuts"] = time.time() - start
+        start = time.time()
+
         dataset = NumpyDataset(audios, sampling_rate=self.sampling_rate)
 
         def collate_fn(batch, device=self.device):
@@ -244,6 +247,8 @@ class OmniSenseVoiceSmall:
 
                 timings["decode"] += time.time() - start
                 start = time.time()
+
+        print(timings)
 
         if timestamps:
             return results

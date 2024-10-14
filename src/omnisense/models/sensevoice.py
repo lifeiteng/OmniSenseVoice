@@ -17,8 +17,8 @@ from lhotse.supervision import AlignmentItem
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
-from .model import SenseVoiceSmall
 from .k2_utils import ctc_greedy_search
+from .model import SenseVoiceSmall
 
 
 # modified from Lhotse AlignmentItem
@@ -116,8 +116,7 @@ class OmniSenseVoiceSmall:
         self.sampling_rate = self.frontend.opts.frame_opts.samp_freq
 
         self.device = "cpu"
-        if device_id != -1:
-            assert torch.cuda.is_available(), "CUDA is not available"
+        if device_id != -1 and torch.cuda.is_available():
             self.device = f"cuda:{device_id}"
 
         model.eval()
@@ -196,16 +195,26 @@ class OmniSenseVoiceSmall:
                     token_int = yseq.tolist()
                     results[index] = OmniTranscription.parse(self.tokenizer.decode(token_int))
 
-                utt_time_pairs, utt_words = ctc_greedy_search(ctc_logits[:, 4:], encoder_out_lens - 4,
-                                  sp=self.tokenizer.sp,
-                                  subsampling_factor=6,
-                                  frame_shift_ms=self.frontend.opts.frame_opts.frame_shift_ms)
-                for k, (result, time_pairs, words) in enumerate(zip([results[index] for index in indexs], utt_time_pairs, utt_words)):
-                    results[indexs[k]] = result._replace(words=[AlignmentItem(symbol=word, start=pair[0], duration=round(pair[1] - pair[0], ndigits=4)) for (pair, word) in zip(time_pairs, words)],
-                                                         text=" ".join(words))
+                utt_time_pairs, utt_words = ctc_greedy_search(
+                    ctc_logits[:, 4:],
+                    encoder_out_lens - 4,
+                    sp=self.tokenizer.sp,
+                    subsampling_factor=6,
+                    frame_shift_ms=self.frontend.opts.frame_opts.frame_shift_ms,
+                )
+                for k, (result, time_pairs, words) in enumerate(
+                    zip([results[index] for index in indexs], utt_time_pairs, utt_words)
+                ):
+                    results[indexs[k]] = result._replace(
+                        words=[
+                            AlignmentItem(symbol=word, start=pair[0], duration=round(pair[1] - pair[0], ndigits=4))
+                            for (pair, word) in zip(time_pairs, words)
+                        ],
+                        text=" ".join(words),
+                    )
             else:
                 encoder_out_lens = encoder_out_lens.cpu().numpy().tolist()
- 
+
                 ctc_maxids = ctc_logits.argmax(dim=-1)
 
                 for b, index in enumerate(indexs):
@@ -217,7 +226,7 @@ class OmniSenseVoiceSmall:
 
         if timestamps:
             return results
-        
+
         return [OmniTranscription.parse(i) for i in results]
 
     def extract_feat(self, waveform_list: List[np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:

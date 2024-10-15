@@ -271,5 +271,8 @@ class NumpyDataset(Dataset):
         else:
             raise ValueError(f"Unsupported audio type {type(segment)}")
 
+        if audio[1].shape[0] <= 1000:
+            audio = (audio[0], np.pad(audio[1], (0, 1000 - audio[1].shape[0])))
+
         assert audio[1].ndim == 1, f"Only support mono audio, but got {audio[1].ndim} channels"
         return audio

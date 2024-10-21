@@ -1,8 +1,11 @@
-src/OmniSenseVoice.egg-info/
-__pycache__/
 *.pyc
-*.pyo
 *.pyd
-benchmark/
-.vscode/
+*.pyo
+.DS_Store
 .hypothesis/
+.vscode/
+__pycache__/
+benchmark/
+build/
+dist/
+src/OmniSenseVoice.egg-info/

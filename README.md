@@ -7,7 +7,7 @@ Built on [SenseVoice](https://github.com/FunAudioLLM/SenseVoice), Omni SenseVoic
 ## Install
 
 ```
-pip install OmniSenseVoice==0.1.0
+pip3 install OmniSenseVoice
 ```
 
 ## Usage

@@ -1,8 +1,12 @@
 from setuptools import find_packages, setup
 
+__repository_url__ = "https://github.com/lifeiteng/OmniSenseVoice"
+__download_url__ = "https://github.com/lifeiteng/OmniSenseVoice/releases"
+
+
 setup(
     name="OmniSenseVoice",
-    version="0.1.0",
+    version="0.1.2",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     package_data={"": []},
@@ -10,6 +14,9 @@ setup(
     author="lifeiteng0422@gmail.com",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
+    # The project's main homepage.
+    url=__repository_url__,
+    download_url=__download_url__,
     readme="README.md",
     python_requires=">=3.8",
     install_requires=[

@@ -134,6 +134,7 @@ class OmniSenseVoiceSmall:
         batch_size: int = 4,
         timestamps: bool = False,
         num_workers: int = 0,
+        progressbar: bool = True,
     ) -> List[OmniTranscription]:
         if isinstance(audio, List):
             indexs = list(range(len(audio)))
@@ -178,7 +179,9 @@ class OmniSenseVoiceSmall:
         )
 
         results = [None] * len(audios)
-        for batch in tqdm(dataloader, desc="Transcribing", total=len(audios) // batch_size):
+        for batch in (
+            tqdm(dataloader, desc="Transcribing", total=len(audios) // batch_size) if progressbar else dataloader
+        ):
             batch_size, indexs, feats, feats_len = batch
 
             ctc_logits, encoder_out_lens = self.model.inference(

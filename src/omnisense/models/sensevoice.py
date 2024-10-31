@@ -88,7 +88,7 @@ class OmniTranscription(NamedTuple):
         match = re.match(PATTERN, input_string)
         if match:
             language, emotion, event, textnorm, text = match.groups()
-            return cls(language, emotion, event, textnorm, text)
+            return cls(language, emotion, event, textnorm, text or "")
         else:
             # <|ja|><|EMO_UNKNOWN|><|Speech|>
             pattern = r"<\|([^|]+)\|><\|([^|]+)\|><\|([^|]+)\|>"

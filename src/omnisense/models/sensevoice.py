@@ -20,6 +20,8 @@ from tqdm import tqdm
 from .k2_utils import ctc_greedy_search
 from .model import SenseVoiceSmall
 
+PATTERN = r"<\|([^|]+)\|><\|([^|]+)\|><\|([^|]+)\|><\|([^|]+)\|>(.*)?"
+
 
 # modified from Lhotse AlignmentItem
 class OmniTranscription(NamedTuple):
@@ -82,13 +84,20 @@ class OmniTranscription(NamedTuple):
         """
         # '<|nospeech|><|EMO_UNKNOWN|><|Laughter|><|woitn|>'
         # '<|en|><|NEUTRAL|><|Speech|><|withitn|>As you can see...'
-        pattern = r"<\|([^|]+)\|><\|([^|]+)\|><\|([^|]+)\|><\|([^|]+)\|>(.*)?"
-        match = re.match(pattern, input_string)
+
+        match = re.match(PATTERN, input_string)
         if match:
             language, emotion, event, textnorm, text = match.groups()
             return cls(language, emotion, event, textnorm, text)
         else:
-            raise ValueError(f"Cannot parse the input string: {input_string}")
+            # <|ja|><|EMO_UNKNOWN|><|Speech|>
+            pattern = r"<\|([^|]+)\|><\|([^|]+)\|><\|([^|]+)\|>"
+            match = re.match(pattern, input_string)
+            if match:
+                language, emotion, event = match.groups()
+                return cls(language, emotion, event, "")
+            else:
+                return cls("", "", "", "", input_string)
 
 
 class OmniSenseVoiceSmall:

@@ -25,6 +25,7 @@ setup(
         "funasr==1.1.6",
         "lhotse>=1.24.2",
         "kaldialign",
+        "torch",
     ],
     entry_points={
         "console_scripts": ["omnisense=omnisense.bin:cli"],

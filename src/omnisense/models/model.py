@@ -653,3 +653,11 @@ class SenseVoiceSmall(nn.Module):
         # c. Passed the encoder result and the beam search
         ctc_logits = self.ctc.ctc_lo(encoder_out)
         return ctc_logits, encoder_out_lens
+
+    def export(self, **kwargs):
+        from funasr.models.sense_voice.export_meta import export_rebuild_model
+
+        if "max_seq_len" not in kwargs:
+            kwargs["max_seq_len"] = 512
+        models = export_rebuild_model(model=self, **kwargs)
+        return models

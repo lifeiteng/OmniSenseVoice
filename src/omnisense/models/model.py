@@ -521,7 +521,8 @@ class SenseVoiceEncoderSmall(nn.Module):
         ilens: torch.Tensor,
     ):
         """Embed positions in tensor."""
-        masks = sequence_mask(ilens, device=ilens.device)[:, None, :]
+        maxlen = xs_pad.shape[1]
+        masks = sequence_mask(ilens, maxlen=maxlen, device=ilens.device)[:, None, :]
 
         xs_pad *= self.output_size() ** 0.5
 
@@ -614,7 +615,7 @@ class SenseVoiceSmall(nn.Module):
     def from_pretrained(model: str = None, **kwargs):
         from funasr import AutoModel
 
-        model, kwargs = AutoModel.build_model(model=model, trust_remote_code=True, **kwargs)
+        model, kwargs = AutoModel.build_model(model=model, trust_remote_code=False, **kwargs)
 
         return model, kwargs
 

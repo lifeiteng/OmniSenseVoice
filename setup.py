@@ -6,7 +6,7 @@ __download_url__ = "https://github.com/lifeiteng/OmniSenseVoice/releases"
 
 setup(
     name="OmniSenseVoice",
-    version="0.1.7",
+    version="0.1.8",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     package_data={"": []},
@@ -26,6 +26,7 @@ setup(
         "lhotse>=1.24.2",
         "kaldialign",
         "torch",
+        "torchaudio",
     ],
     entry_points={
         "console_scripts": ["omnisense=omnisense.bin:cli"],

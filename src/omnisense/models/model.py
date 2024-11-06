@@ -1,6 +1,6 @@
 # modified from https://github.com/FunAudioLLM/SenseVoice/blob/main/model.py
 
-from typing import Optional
+from typing import List, Optional, Union
 
 import torch
 import torch.nn.functional as F
@@ -634,13 +634,21 @@ class SenseVoiceSmall(nn.Module):
         self,
         speech: torch.Tensor,
         speech_lengths: torch.Tensor,
-        language: str,
+        language: Union[str, List[str]],
         textnorm: str,
     ):
         batch_size, device = speech.size(0), speech.device
-        language_query = self.embed(
-            torch.LongTensor([[self.lid_dict[language] if language in self.lid_dict else 0]]).to(device)
-        ).repeat(batch_size, 1, 1)
+        if isinstance(language, list):
+            language_query = self.embed(
+                torch.LongTensor(
+                    [[self.lid_dict[_language] if _language in self.lid_dict else 0] for _language in language]
+                ).to(device)
+            )
+        else:
+            language_query = self.embed(
+                torch.LongTensor([[self.lid_dict[language] if language in self.lid_dict else 0]]).to(device)
+            ).repeat(batch_size, 1, 1)
+
         textnorm_query = self.embed(torch.LongTensor([[self.textnorm_dict[textnorm]]]).to(device)).repeat(
             batch_size, 1, 1
         )

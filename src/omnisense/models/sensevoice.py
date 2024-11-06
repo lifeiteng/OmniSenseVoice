@@ -137,7 +137,7 @@ class OmniSenseVoiceSmall:
     def transcribe(
         self,
         audio: Union[str, List[str], np.ndarray, List[np.ndarray], List[Cut]],
-        language: str = "auto",
+        language: Union[str, List[str]] = "auto",
         textnorm: str = "woitn",
         sort_by_duration: bool = True,
         batch_size: int = 4,
@@ -146,34 +146,43 @@ class OmniSenseVoiceSmall:
         progressbar: bool = True,
     ) -> List[OmniTranscription]:
         if isinstance(audio, List):
+            if not isinstance(language, List):
+                languages = [language] * len(audio)
+            else:
+                languages = language
+                assert len(languages) == len(
+                    audio
+                ), "The length of audio and language must be the same, or language must be a single string."
+
             indexs = list(range(len(audio)))
             if sort_by_duration:
                 if isinstance(audio[0], Cut):
-                    audios = sorted(zip(indexs, audio), key=lambda x: x[1].duration, reverse=False)
+                    audios = sorted(zip(indexs, zip(audio, languages)), key=lambda x: x[1][0].duration, reverse=False)
                 elif isinstance(audio[0], str):
                     recordings = [Recording.from_file(i) for i in audio]
                     cuts = [
                         MultiCut(id="", recording=recording, start=0, duration=recording.duration, channel=0)
                         for recording in recordings
                     ]
-                    audios = sorted(zip(indexs, cuts), key=lambda x: x[1].duration, reverse=False)
+                    audios = sorted(zip(indexs, zip(cuts, languages)), key=lambda x: x[1][0].duration, reverse=False)
                 elif isinstance(audio[0], np.ndarray):
-                    audios = sorted(zip(indexs, audio), key=lambda x: x[1].shape[0], reverse=False)
+                    audios = sorted(zip(indexs, zip(audio, languages)), key=lambda x: x[1][0].shape[0], reverse=False)
                 else:
                     raise ValueError(f"Unsupported audio type {type(audio[0])}")
             else:
-                audios = list(enumerate(audio))
+                audios = list(enumerate(zip(audio, languages)))
         else:
-            audios = [(0, audio)]
+            audios = [(0, (audio, language[0] if isinstance(language, list) else language))]
 
         dataset = NumpyDataset(audios, sampling_rate=self.sampling_rate)
 
         def collate_fn(batch, device=self.device):
             batch_size = len(batch)
-            feats, feats_len = self.extract_feat([item[1] for item in batch])
+            feats, feats_len = self.extract_feat([item[1][0] for item in batch])
             return (
                 batch_size,
                 [item[0] for item in batch],
+                [item[1][1] for item in batch],
                 feats,
                 feats_len,
             )
@@ -191,12 +200,12 @@ class OmniSenseVoiceSmall:
         for batch in (
             tqdm(dataloader, desc="Transcribing", total=len(audios) // batch_size) if progressbar else dataloader
         ):
-            batch_size, indexs, feats, feats_len = batch
+            batch_size, indexs, languages, feats, feats_len = batch
 
             ctc_logits, encoder_out_lens = self.model.inference(
                 torch.from_numpy(feats).to(self.device),
                 torch.from_numpy(feats_len).to(self.device),
-                language,
+                languages,
                 textnorm,
             )
             if timestamps:
@@ -273,18 +282,19 @@ class NumpyDataset(Dataset):
         return len(self.segments)
 
     def __getitem__(self, idx):
-        segment = self.segments[idx]
-        if isinstance(segment[1], np.ndarray):
+        segment = self.segments[idx]  # (index, (audio, language))
+
+        if isinstance(segment[1][0], np.ndarray):
             audio = segment
-        elif isinstance(segment[1], str) or isinstance(segment[1], Path):
-            audio = (segment[0], librosa.load(segment[1], sr=self.sampling_rate, mono=True)[0])
-        elif isinstance(segment[1], Cut):
-            audio = (segment[0], segment[1].resample(self.sampling_rate).load_audio()[0])
+        elif isinstance(segment[1][0], str) or isinstance(segment[1][0], Path):
+            audio = (segment[0], (librosa.load(segment[1][0], sr=self.sampling_rate, mono=True)[0], segment[1][1]))
+        elif isinstance(segment[1][0], Cut):
+            audio = (segment[0], (segment[1][0].resample(self.sampling_rate).load_audio()[0], segment[1][1]))
         else:
-            raise ValueError(f"Unsupported audio type {type(segment)}")
+            raise ValueError(f"Unsupported audio type {type(segment[1][0])}")
 
-        if audio[1].shape[0] <= 1000:
-            audio = (audio[0], np.pad(audio[1], (0, 1000 - audio[1].shape[0])))
+        if audio[1][0].shape[0] <= 1000:
+            audio = (audio[0], (np.pad(audio[1][0], (0, 1000 - audio[1][0].shape[0])), audio[1][1]))
 
-        assert audio[1].ndim == 1, f"Only support mono audio, but got {audio[1].ndim} channels"
+        assert audio[1][0].ndim == 1, f"Only support mono audio, but got {audio[1][0].ndim} channels"
         return audio

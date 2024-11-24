@@ -37,15 +37,8 @@ class OmniTranscription(NamedTuple):
     textnorm: str
 
     text: Optional[str] = None
-    # start: Optional[float] = None
-    # duration: Optional[float] = None
 
     words: Optional[List[AlignmentItem]] = None
-
-    # # Score is an optional aligner-specific measure of confidence.
-    # # A simple measure can be an average probability of "symbol" across
-    # # frames covered by the AlignmentItem.
-    # score: Optional[float] = None
 
     @property
     def end(self) -> float:
@@ -58,23 +51,19 @@ class OmniTranscription(NamedTuple):
             "event": self.event,
             "textnorm": self.textnorm,
             "text": self.text,
-            # "start": self.start,
-            # "duration": self.duration,
-            # "end": self.end,
-            # "score": self.score,
+            **({"words": [w.serialize() for w in self.words]} if self.words is not None else {}),
         }
 
     @classmethod
     def from_dict(cls, data: dict):
+        words = data.get("words", [])
         return OmniTranscription(
             language=data["language"],
             emotion=data["emotion"],
             event=data["event"],
             textnorm=data["textnorm"],
             text=data.get("text"),
-            # start=data.get("start"),
-            # duration=data.get("duration"),
-            # score=data.get("score"),
+            words=[AlignmentItem.deserialize(w) for w in words] if words else None,
         )
 
     @classmethod

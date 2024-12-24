@@ -100,10 +100,18 @@ class OmniSenseVoiceSmall:
         self,
         model_dir: Union[str, Path] = None,
         device_id: Union[str, int] = "-1",
+        device: Optional[str] = None,
         quantize: bool = False,
     ):
-        model, kwargs = SenseVoiceSmall.from_pretrained(model_dir, quantize=quantize)
         device_id = int(device_id)
+        if device:
+            self.device = device
+        else:
+            self.device = "cpu"
+            if device_id != -1 and torch.cuda.is_available():
+                self.device = f"cuda:{device_id}"
+
+        model, kwargs = SenseVoiceSmall.from_pretrained(model_dir, quantize=quantize, device=self.device)
 
         config_file = kwargs["config"]
         config = read_yaml(config_file)
@@ -112,10 +120,6 @@ class OmniSenseVoiceSmall:
         self.frontend = WavFrontend(**config["frontend_conf"])
         self.frontend.opts.frame_opts.dither = 0
         self.sampling_rate = self.frontend.opts.frame_opts.samp_freq
-
-        self.device = "cpu"
-        if device_id != -1 and torch.cuda.is_available():
-            self.device = f"cuda:{device_id}"
 
         model.eval()
         self.model = model.to(self.device)

@@ -105,7 +105,7 @@ class OmniSenseVoiceSmall:
     ):
         device_id = int(device_id)
         if device:
-            self.device = device
+            self.device = str(device)
         else:
             self.device = "cpu"
             if device_id != -1 and torch.cuda.is_available():

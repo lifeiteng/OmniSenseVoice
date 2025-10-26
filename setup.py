@@ -6,7 +6,7 @@ __download_url__ = "https://github.com/lifeiteng/OmniSenseVoice/releases"
 
 setup(
     name="OmniSenseVoice",
-    version="0.2.0",
+    version="0.2.1",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     package_data={"": []},
@@ -34,11 +34,11 @@ setup(
     include_package_data=True,
     classifiers=[
         "Development Status :: 5 - Production/Stable",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
         "Intended Audience :: Science/Research",
         "Operating System :: POSIX :: Linux",
         "Operating System :: MacOS :: MacOS X",

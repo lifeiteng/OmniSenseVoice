@@ -229,14 +229,11 @@ class OmniSenseVoiceSmall:
             else:
                 encoder_out_lens = encoder_out_lens.cpu().numpy().tolist()
 
-                ctc_maxids = ctc_logits.argmax(dim=-1).cpu().numpy()
+                ctc_maxids = ctc_logits.argmax(dim=-1)
 
                 for b, index in enumerate(indexs):
                     yseq = ctc_maxids[b, : encoder_out_lens[b]]
-                    # Use np.diff and np.where instead of torch.unique_consecutive.
-                    mask = np.concatenate(([True], np.diff(yseq) != 0))
-                    yseq = yseq[mask]
-
+                    yseq = torch.unique_consecutive(yseq, dim=-1)
                     mask = yseq != self.blank_id
                     token_int = yseq[mask].tolist()
                     results[index] = self.tokenizer.decode(token_int)

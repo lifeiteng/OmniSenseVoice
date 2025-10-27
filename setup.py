@@ -6,7 +6,7 @@ __download_url__ = "https://github.com/lifeiteng/OmniSenseVoice/releases"
 
 setup(
     name="OmniSenseVoice",
-    version="0.2.1",
+    version="0.2.2",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     package_data={"": []},
@@ -22,7 +22,7 @@ setup(
     install_requires=[
         "funasr_onnx==0.4.1",
         "modelscope==1.18.0",
-        "funasr==1.1.6",
+        "funasr>=1.1.6",
         "lhotse>=1.24.2",
         "kaldialign",
         "torch",

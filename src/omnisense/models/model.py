@@ -4,7 +4,6 @@ from typing import List, Optional, Union
 
 import torch
 import torch.nn.functional as F
-from funasr.models.ctc.ctc import CTC
 from funasr.register import tables
 from torch import nn
 
@@ -404,6 +403,19 @@ class EncoderLayerSANM(nn.Module):
             x = self.norm2(x)
 
         return x, cache
+
+
+class CTC(torch.nn.Module):
+    def __init__(
+        self,
+        odim: int,
+        encoder_output_size: int,
+    ):
+        super().__init__()
+        self.ctc_lo = torch.nn.Linear(encoder_output_size, odim)
+
+    def forward(self, hs_pad, hlens, ys_pad, ys_lens):
+        raise NotImplementedError
 
 
 @tables.register("encoder_classes", "SenseVoiceEncoderSmall")

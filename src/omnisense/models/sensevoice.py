@@ -8,15 +8,15 @@ from typing import Any, List, NamedTuple, Optional, Tuple, Union
 import librosa
 import numpy as np
 import torch
-from funasr_onnx.utils.frontend import WavFrontend
-from funasr_onnx.utils.sentencepiece_tokenizer import SentencepiecesTokenizer
-from funasr_onnx.utils.utils import read_yaml
 from lhotse.audio import Recording
 from lhotse.cut import Cut, MultiCut
 from lhotse.supervision import AlignmentItem
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
+from ..utils.frontend import WavFrontend
+from ..utils.sentencepiece_tokenizer import SentencepiecesTokenizer
+from ..utils.utils import read_yaml
 from .k2_utils import ctc_greedy_search
 from .model import SenseVoiceSmall
 

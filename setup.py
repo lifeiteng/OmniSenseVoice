@@ -6,7 +6,7 @@ __download_url__ = "https://github.com/lifeiteng/OmniSenseVoice/releases"
 
 setup(
     name="OmniSenseVoice",
-    version="0.2.2",
+    version="0.4.0",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     package_data={"": []},
@@ -20,14 +20,17 @@ setup(
     readme="README.md",
     python_requires=">=3.8",
     install_requires=[
-        "funasr_onnx==0.4.1",
-        "modelscope==1.18.0",
+        "modelscope>=1.18.0",
         "funasr>=1.1.6",
         "lhotse>=1.24.2",
         "kaldialign",
         "torch",
-        "torchaudio",
     ],
+    extras_require={
+        "test": [
+            "funasr_onnx==0.4.1",
+        ],
+    },
     entry_points={
         "console_scripts": ["omnisense=omnisense.bin:cli"],
     },

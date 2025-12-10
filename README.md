@@ -61,7 +61,7 @@ omnisense benchmark -s --num-workers 4 --device-id 0 --batch-size 16 --textnorm 
 Set up pre-commit hooks:
 
 ```
-pip install pre-commit==3.6.0
+pip install pre-commit==4.2.0
 pre-commit install
 ```
 

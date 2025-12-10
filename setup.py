@@ -20,14 +20,19 @@ setup(
     readme="README.md",
     python_requires=">=3.8",
     install_requires=[
+        "kaldi-native-fbank",
         "modelscope>=1.18.0",
         "funasr>=1.1.6",
         "lhotse>=1.24.2",
-        "kaldialign",
         "torch",
+        "torchaudio",
     ],
     extras_require={
+        "benchmark": [
+            "kaldialign",
+        ],
         "test": [
+            "onnxscript",
             "funasr_onnx==0.4.1",
         ],
     },
@@ -42,6 +47,7 @@ setup(
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         "Intended Audience :: Science/Research",
         "Operating System :: POSIX :: Linux",
         "Operating System :: MacOS :: MacOS X",

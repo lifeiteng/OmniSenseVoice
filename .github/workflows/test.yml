@@ -1,0 +1,55 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [ main, dev, develop ]
+  pull_request:
+    branches: [ main, dev, develop ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }} with Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set TEMP directory on Windows
+        if: runner.os == 'Windows'
+        run: |
+          echo "TEMP=C:\tmp" >> $env:GITHUB_ENV
+          echo "TMP=C:\tmp" >> $env:GITHUB_ENV
+          New-Item -ItemType Directory -Force -Path C:\tmp
+        shell: pwsh
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('setup.py') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install & Model Test
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -e . --prefer-binary
+          python tests/model_test.py
+
+      # - name: Install & Model/funasr Test
+      #   run: |
+      #     pip install -e .[test]
+      #     python tests/funasr_model_test.py

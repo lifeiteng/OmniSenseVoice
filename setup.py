@@ -6,7 +6,7 @@ __download_url__ = "https://github.com/lifeiteng/OmniSenseVoice/releases"
 
 setup(
     name="OmniSenseVoice",
-    version="0.4.0",
+    version="0.4.2",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     package_data={"": []},
